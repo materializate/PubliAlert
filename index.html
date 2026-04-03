@@ -281,19 +281,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff-b);display:flex
 <script>
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 const CHANNELS = [
-  {slug:'la1',   name:'La 1',      logo:'🔵',model:'tve1',  epgId:'La1.es'      },
-  {slug:'la2',   name:'La 2',      logo:'🟢',model:'tve2',  epgId:'La2.es'      },
-  {slug:'a3',    name:'Antena 3',  logo:'🟠',model:'heavy', epgId:'Antena3.es'  },
-  {slug:'cuatro',name:'Cuatro',    logo:'🟣',model:'medium',epgId:'Cuatro.es'   },
-  {slug:'t5',    name:'Telecinco', logo:'🔴',model:'heavy', epgId:'Telecinco.es'},
-  {slug:'sexta', name:'La Sexta',  logo:'🟡',model:'medium',epgId:'LaSexta.es'  },
-  {slug:'dmax',  name:'DMAX',      logo:'🔧',model:'medium',epgId:'DMAX.es'     },
-  {slug:'mega',  name:'Mega',      logo:'⚡',model:'light', epgId:'Mega.es'     },
-  {slug:'neox',  name:'Neox',      logo:'🌐',model:'light', epgId:'Neox.es'     },
-  {slug:'fdf',   name:'FDF',       logo:'🎬',model:'light', epgId:'FDF.es'      },
-  {slug:'energy',name:'Energy',    logo:'💥',model:'medium',epgId:'Energy.es'   },
-  {slug:'div',   name:'Divinity',  logo:'✨',model:'medium',epgId:'Divinity.es' },
-  {slug:'bemad', name:'BeMad',     logo:'🎸',model:'light', epgId:'beMad.es'    },
+  {slug:'la1',   name:'La 1',      logo:'🔵',model:'tve1',  epgIds:['La1.TV','La1.es','La 1']                             },
+  {slug:'la2',   name:'La 2',      logo:'🟢',model:'tve2',  epgIds:['La2.TV','La2.es','La 2']                             },
+  {slug:'a3',    name:'Antena 3',  logo:'🟠',model:'heavy', epgIds:['Antena3.TV','Antena3.es','Antena 3']                 },
+  {slug:'cuatro',name:'Cuatro',    logo:'🟣',model:'medium',epgIds:['Cuatro.TV','Cuatro.es','Cuatro']                     },
+  {slug:'t5',    name:'Telecinco', logo:'🔴',model:'heavy', epgIds:['Telecinco.TV','Telecinco.es','Telecinco']            },
+  {slug:'sexta', name:'La Sexta',  logo:'🟡',model:'medium',epgIds:['LaSexta.TV','LaSexta.es','La Sexta']                },
+  {slug:'dmax',  name:'DMAX',      logo:'🔧',model:'medium',epgIds:['DMax.TV','DMAX.TV','DMAX.es','DMax.es','DMAX']       },
+  {slug:'mega',  name:'Mega',      logo:'⚡',model:'light', epgIds:['Mega.TV','Mega.es','Mega']                           },
+  {slug:'neox',  name:'Neox',      logo:'🌐',model:'light', epgIds:['Neox.TV','Neox.es','Neox']                           },
+  {slug:'fdf',   name:'FDF',       logo:'🎬',model:'light', epgIds:['FactoriadeFiccion.TV','FDF.TV','FDF.es','FDF']       },
+  {slug:'energy',name:'Energy',    logo:'💥',model:'medium',epgIds:['Energy.TV','Energy.es','Energy']                     },
+  {slug:'div',   name:'Divinity',  logo:'✨',model:'medium',epgIds:['Divinity.TV','Divinity.es','Divinity']               },
+  {slug:'bemad', name:'BeMad',     logo:'🎸',model:'light', epgIds:['Bemad.TV','BeMad.TV','beMad.es','BeMad.es','Be Mad'] },
 ];
 const MODELS={
   heavy: {cycle:30,adDur:9, prime:{cycle:25,adDur:10},night:{cycle:38,adDur:7}},
@@ -341,7 +341,11 @@ async function loadEPG(){
     });
     epgStatus=Object.keys(epgData).length?'ok':'error';
     setEpgPills(epgStatus==='ok'?'ok':'err',epgStatus==='ok'?'EPG ✓':'STAT');
-    if(epgStatus==='ok') addLog('✅',`EPG cargado — ${n} programas`);
+    if(epgStatus==='ok'){
+    const matched=CHANNELS.filter(ch=>ch.epgIds.some(id=>epgData[id]&&epgData[id].length>0)).map(ch=>ch.name);
+    addLog('✅',`EPG cargado — ${n} prog. · canales con datos: ${matched.join(', ')||'ninguno'}`);
+    if(matched.length===0) addLog('⚠️',`IDs del EPG no coinciden. IDs disponibles: ${Object.keys(epgData).slice(0,8).join(', ')}…`);
+  }
   }catch{epgStatus='error';setEpgPills('err','STAT');}
   renderAllChannels();
 }
@@ -358,10 +362,14 @@ function pxd(s){
 }
 
 // ─── EVALUATE ─────────────────────────────────────────────────────────────────
-function evaluate(slug,epgId,modelKey){
+function getEpgProgs(epgIds){
+  for(const id of epgIds){if(epgData[id]&&epgData[id].length>0) return epgData[id];}
+  return [];
+}
+function evaluate(slug,epgIds,modelKey){
   const now=new Date();
   if(epgStatus==='ok'){
-    const progs=epgData[epgId]||[];
+    const progs=getEpgProgs(epgIds);
     const cur=progs.find(p=>p.start<=now&&now<p.stop);
     if(cur){
       const txt=cur.title.toLowerCase();
@@ -373,8 +381,8 @@ function evaluate(slug,epgId,modelKey){
       const until=cur.stop.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
       return{isAd,source:'epg',label:isAd?(isShort?`Corte (~${Math.round(dur)}min)`:cur.title):cur.title,until:`hasta ${until}`,pct};
     }
-    if((epgData[epgId]||[]).length>0){
-      const next=(epgData[epgId]||[]).filter(p=>p.start>now).sort((a,b)=>a.start-b.start)[0];
+    if(progs.length>0){
+      const next=progs.filter(p=>p.start>now).sort((a,b)=>a.start-b.start)[0];
       const gapMin=next?Math.round((next.start-now)/60000):'?';
       const until=next?`hasta ${next.start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}` :'';
       return{isAd:true,source:'gap',label:`Hueco EPG (~${gapMin}min)`,until,pct:75};
@@ -418,7 +426,7 @@ function setWatchChannel(slug){
 function tick(){
   if(!watchingSlug) return;
   const ch=CHANNELS.find(c=>c.slug===watchingSlug);if(!ch) return;
-  const r=evaluate(ch.slug,ch.epgId,ch.model);
+  const r=evaluate(ch.slug,ch.epgIds,ch.model);
   updateHomeCard(ch,r);
   const was=prevAdState;prevAdState=r.isAd;
   if(r.isAd&&was===false){
@@ -460,7 +468,7 @@ function renderAllChannels(){
     const list=document.getElementById(listId);if(!list) return;
     list.innerHTML='';
     CHANNELS.forEach(ch=>{
-      const r=evaluate(ch.slug,ch.epgId,ch.model);
+      const r=evaluate(ch.slug,ch.epgIds,ch.model);
       const isCur=ch.slug===watchingSlug;
       const div=document.createElement('div');
       div.className='ch-item'+(isCur?' current':'');
