@@ -306,59 +306,34 @@ const OFFSETS={la1:5,la2:12,a3:0,cuatro:17,t5:8,sexta:23,dmax:14,mega:3,neox:31,
 const AD_W  =['publicidad','anuncio','espacio publicitario','publi','comercial','pausa','bloque pub','intermedio','avances','adelanto','próximamente'];
 const PROG_W=['telediario','noticias','informativo','película','cine','serie','documental','deporte','fútbol','baloncesto','tenis','reality','magazine','concurso','late','show','debate','gala','musical','directo','especial'];
 
-// ─── EPG ──────────────────────────────────────────────────────────────────────
-const EPG_URL='https://www.tdtchannels.com/epg/TV.xml';
-const PROXIES=[
-  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
-  u=>`https://thingproxy.freeboard.io/fetch/${encodeURIComponent(u)}`,
-];
+// ─── EPG ─────────────────────────────────────────────────────────────────────
+// Lee epg.json del propio repo (sin CORS, sin proxies)
+// La GitHub Action lo actualiza cada hora automáticamente
 let epgData={}, epgStatus='none';
 
 async function loadEPG(){
   setEpgPills('loading','<span class="spin"></span> EPG…');
-  let xml=null;
-  for(let i=0;i<PROXIES.length;i++){
-    try{
-      const r=await fetch(PROXIES[i](EPG_URL),{signal:AbortSignal.timeout(12000)});
-      if(!r.ok) throw new Error();
-      const t=await r.text();
-      if(t.includes('<programme')){xml=t;break;}
-    }catch{}
-  }
-  if(!xml){epgStatus='error';setEpgPills('err','STAT');addLog('⚠️','EPG no disponible — modelo estadístico activo');return;}
   try{
-    const clean=xml.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#)/g,'&amp;');
-    const doc=new DOMParser().parseFromString(clean,'application/xml');
-    if(doc.querySelector('parsererror')) throw new Error();
+    const r=await fetch('./epg.json?_='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json=await r.json();
+    if(!json.channels) throw new Error('Sin datos');
     epgData={};let n=0;
-    doc.querySelectorAll('programme').forEach(p=>{
-      const ch=p.getAttribute('channel'),s=pxd(p.getAttribute('start')),e=pxd(p.getAttribute('stop'));
-      const ti=p.querySelector('title')?.textContent?.trim()||'';
-      if(!ch||!s||!e||!ti) return;
-      if(!epgData[ch]) epgData[ch]=[];
-      epgData[ch].push({title:ti,start:s,stop:e});n++;
-    });
-    epgStatus=Object.keys(epgData).length?'ok':'error';
-    setEpgPills(epgStatus==='ok'?'ok':'err',epgStatus==='ok'?'EPG ✓':'STAT');
-    if(epgStatus==='ok'){
-    const matched=CHANNELS.filter(ch=>ch.epgIds.some(id=>epgData[id]&&epgData[id].length>0)).map(ch=>ch.name);
-    addLog('✅',`EPG cargado — ${n} prog. · canales con datos: ${matched.join(', ')||'ninguno'}`);
-    if(matched.length===0) addLog('⚠️',`IDs del EPG no coinciden. IDs disponibles: ${Object.keys(epgData).slice(0,8).join(', ')}…`);
+    for(const [chId,progs] of Object.entries(json.channels)){
+      epgData[chId]=progs.map(p=>({title:p.t,start:new Date(p.s*1000),stop:new Date(p.e*1000)}));
+      n+=progs.length;
+    }
+    epgStatus='ok';
+    const updated=new Date(json.updated*1000).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const matched=CHANNELS.filter(ch=>ch.epgIds.some(id=>epgData[id]?.length>0)).map(ch=>ch.name);
+    setEpgPills('ok',`EPG ✓ ${updated}`);
+    addLog('✅',`EPG — ${n} prog. · ${matched.join(', ')}`);
+    if(matched.length===0){epgStatus='error';setEpgPills('err','EPG sin datos');addLog('⚠️',`IDs: ${Object.keys(epgData).slice(0,6).join(', ')}…`);}
+  }catch(e){
+    epgStatus='error';setEpgPills('err','STAT');
+    addLog('⚠️',`EPG no disponible (${e.message}) — modelo estadístico activo`);
   }
-  }catch{epgStatus='error';setEpgPills('err','STAT');}
   renderAllChannels();
-}
-
-function pxd(s){
-  if(!s) return null; s=s.trim();
-  try{
-    const yr=+s.slice(0,4),mo=+s.slice(4,6)-1,dy=+s.slice(6,8);
-    const hr=+s.slice(8,10),mn=+s.slice(10,12),sc=+s.slice(12,14);
-    const tz=s.slice(14).trim();let off=0;
-    if(tz){const sg=tz[0]==='-'?-1:1;off=sg*((+tz.slice(1,3)||0)*60+(+tz.slice(3,5)||0))*60000;}
-    return new Date(Date.UTC(yr,mo,dy,hr,mn,sc)-off);
-  }catch{return null;}
 }
 
 // ─── EVALUATE ─────────────────────────────────────────────────────────────────
