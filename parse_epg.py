@@ -39,15 +39,24 @@ def parse_dt(s):
 def main():
     print("Leyendo raw.xml...")
     try:
-        with open('raw.xml', 'r', encoding='utf-8', errors='replace') as f:
-            raw = f.read()
+        with open('raw.xml', 'rb') as f:
+            header = f.read(3)
+        # Detectar gzip (magic bytes 1f 8b) — TDTChannels sirve gzip aunque la URL sea .xml
+        if header[:2] == b'\x1f\x8b':
+            print("Detectado gzip — descomprimiendo...")
+            import gzip
+            with gzip.open('raw.xml', 'rt', encoding='utf-8', errors='replace') as f:
+                raw = f.read()
+        else:
+            with open('raw.xml', 'r', encoding='utf-8', errors='replace') as f:
+                raw = f.read()
     except FileNotFoundError:
         print("ERROR: raw.xml no encontrado", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Tamaño XML: {len(raw)} chars")
+    print(f"Tamanyo XML: {len(raw)} chars")
     if len(raw) < 1000:
-        print("ERROR: XML demasiado pequeño, posible descarga fallida", file=sys.stderr)
+        print("ERROR: XML demasiado pequeño", file=sys.stderr)
         print("Contenido:", raw[:500])
         sys.exit(1)
 
