@@ -17,12 +17,11 @@ jobs:
 
       - name: Descargar EPG
         run: |
-          curl -sL --max-time 30 "https://www.tdtchannels.com/epg/TV.xml" -o raw.xml
-          if [ ! -s raw.xml ]; then
-            curl -sL --max-time 30 "https://www.tdtchannels.com/epg/TV.xml.gz" -o raw.xml.gz
-            gunzip -f raw.xml.gz
-          fi
-          echo "Tamano: $(wc -c < raw.xml) bytes"
+          echo "Descargando EPG .xml.gz..."
+          curl -sL --max-time 30 "https://www.tdtchannels.com/epg/TV.xml.gz" -o raw.xml
+          echo "Tamano descargado: $(wc -c < raw.xml) bytes"
+          echo "Primeros bytes (hex):"
+          xxd raw.xml | head -2
 
       - name: Procesar EPG con Python
         run: python3 parse_epg.py
