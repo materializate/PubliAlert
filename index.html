@@ -482,7 +482,7 @@ function statModel(slug){
         const posInCycle=(posInBlock+(OFFSETS[slug]||0))%cycleInBlock;
         const inAd=posInCycle>=2; // primeros 2 min = mini-programa/avance, resto = publi
         return{
-          isAd:Math.random()<(inAd?prob:prob*0.15), // fuera del ciclo-publi, baja prob
+          isAd:inAd,
           pct,
           ml:inAd?0:cycleInBlock-posInCycle,
           confidence:'alta',
@@ -498,14 +498,11 @@ function statModel(slug){
   const cfg=cycles[franja]||cycles['man'];
   const offset=OFFSETS[slug]||0;
   const pos=(totalMin+offset)%cfg.c;
-  const inAd=pos>=(cfg.c-cfg.a);
-  const ml=inAd?0:(cfg.c-cfg.a)-pos;
-  const pct=Math.round((pos/cfg.c)*100);
-
-  // Confianza: más alta en prime time y sobremesa (patrones más predecibles)
+  const isAdCycle=pos>=(cfg.c-cfg.a);
+  const mlCycle=isAdCycle?0:(cfg.c-cfg.a)-pos;
+  const pctCycle=Math.round((pos/cfg.c)*100);
   const conf=(['pri','sob','acc'].includes(franja))?'media-alta':'media';
-
-  return{isAd,pct,ml,confidence:conf,desc:`Ciclo ${franja} (${cfg.c}min/${cfg.a}min publi)`};
+  return{isAd:isAdCycle,pct:pctCycle,ml:mlCycle,confidence:conf,desc:`Ciclo ${franja} (${cfg.c}min/${cfg.a}min publi)`};
 }
 
 function statAdLabel(slug){
