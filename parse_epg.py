@@ -10,18 +10,15 @@ import sys
 from datetime import datetime, timezone
 
 TARGET_IDS = {
-    # Formato .TV (el que usa TDTChannels actualmente)
     'La1.TV', 'La2.TV', 'Antena3.TV', 'Cuatro.TV', 'Telecinco.TV',
     'LaSexta.TV', 'DMax.TV', 'DMAX.TV', 'Mega.TV', 'Neox.TV',
     'FactoriadeFiccion.TV', 'Energy.TV', 'Divinity.TV', 'Bemad.TV',
-    # Formato .es (versiones anteriores / alternativas)
     'La1.es', 'La2.es', 'Antena3.es', 'Cuatro.es', 'Telecinco.es',
     'LaSexta.es', 'DMAX.es', 'DMax.es', 'Mega.es', 'Neox.es',
     'FDF.es', 'Energy.es', 'Divinity.es', 'beMad.es', 'BeMad.es',
 }
 
 def parse_dt(s):
-    """Convierte fecha XMLTV (YYYYMMDDHHMMSS +HHMM) a timestamp Unix."""
     s = s.strip()
     ts = s[:14]
     tz = s[14:].strip()
@@ -41,7 +38,6 @@ def main():
     try:
         with open('raw.xml', 'rb') as f:
             header = f.read(3)
-        # Detectar gzip (magic bytes 1f 8b) — TDTChannels sirve gzip aunque la URL sea .xml
         if header[:2] == b'\x1f\x8b':
             print("Detectado gzip — descomprimiendo...")
             import gzip
@@ -60,7 +56,6 @@ def main():
         print("Contenido:", raw[:500])
         sys.exit(1)
 
-    # Sanear & sin escapar que rompen el parser
     raw = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', '&amp;', raw)
 
     print("Parseando XML...")
@@ -68,7 +63,6 @@ def main():
         root = ET.fromstring(raw)
     except ET.ParseError as e:
         print(f"ERROR parseando XML: {e}", file=sys.stderr)
-        # Intentar con lxml si está disponible
         try:
             import lxml.etree as lET
             root = lET.fromstring(raw.encode('utf-8'), lET.XMLParser(recover=True))
@@ -77,7 +71,6 @@ def main():
             print("lxml no disponible, fallando", file=sys.stderr)
             sys.exit(1)
 
-    # Ver qué channel IDs hay en el XML para diagnóstico
     all_channels = set()
     for ch_el in root.findall('channel'):
         cid = ch_el.get('id', '')
@@ -89,7 +82,6 @@ def main():
     print(f"Canales que coinciden con TARGET_IDS: {matched_targets}")
 
     if not matched_targets:
-        # Los IDs no coinciden — añadir todos los que parezcan españoles
         spanish = {c for c in all_channels if any(
             k in c.lower() for k in
             ['antena','telecinco','cuatro','sexta','la1','la2','mega','neox',
@@ -116,7 +108,7 @@ def main():
         try:
             se = parse_dt(start_s)
             ee = parse_dt(stop_s)
-        except Exception as ex:
+        except Exception:
             continue
         if ch not in result:
             result[ch] = []
