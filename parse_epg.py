@@ -1,47 +1,3 @@
-name: Actualizar EPG
-
-on:
-  schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
-
-jobs:
-  update-epg:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Descargar EPG
-        run: |
-          echo "Descargando EPG .xml.gz..."
-          curl -sL --max-time 30 "https://www.tdtchannels.com/epg/TV.xml.gz" -o raw.xml
-          echo "Tamano descargado: $(wc -c < raw.xml) bytes"
-          echo "Primeros bytes (hex):"
-          xxd raw.xml | head -2
-
-      - name: Procesar EPG con Python
-        run: python3 parse_epg.py
-
-      - name: Verificar resultado
-        run: |
-          python3 -c "
-          import json
-          d = json.load(open('epg.json'))
-          print('Canales:', list(d['channels'].keys()))
-          print('Total programas:', d['count'])
-          "
-
-      - name: Commit EPG
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add epg.json
-          git diff --staged --quiet && echo "Sin cambios" || (git commit -m "EPG $(date -u '+%Y-%m-%d %H:%M UTC')" && git push)
-Y el contenido de parse_epg.py por si también lo necesitas editar directamente:
 #!/usr/bin/env python3
 """
 parse_epg.py — Convierte raw.xml (EPG TDTChannels) a epg.json
@@ -175,4 +131,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-Edita ambos archivos directamente en GitHub con el lápiz ✏️, pega el contenido y haz commit. Luego ejecuta el workflow desde Actions.
